@@ -1,4 +1,5 @@
 # Copyright (c) 2011 Bastian Venthur
+# Modified by James Robert Lloyd 2013
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -28,7 +29,27 @@ import socket
 import multiprocessing
 import libardrone
 
-class ARDroneNetworkProcess(threading.Thread):
+import ctypes
+
+class StoppableThread(threading.Thread):
+    """Thread class with a stop() method. The thread itself has to check
+    regularly for the stopped() condition."""
+
+    def __init__(self):
+        super(StoppableThread, self).__init__()
+        self._stop = threading.Event()
+
+    def stop(self):
+        self._stop.set()
+
+    # A copy for similarity to multiprocessing.Process
+    def terminate(self):
+        self.stop()
+
+    def stopped(self):
+        return self._stop.isSet()
+
+class ARDroneNetworkProcess(StoppableThread):
     """ARDrone Network Process.
 
     This process collects data from the video and navdata port, converts the
@@ -36,7 +57,7 @@ class ARDroneNetworkProcess(threading.Thread):
     """
 
     def __init__(self, com_pipe, is_ar_drone_2, drone):
-        threading.Thread.__init__(self)
+        StoppableThread.__init__(self)
         self._drone = drone
         self.com_pipe = com_pipe
         self.is_ar_drone_2 = is_ar_drone_2
@@ -82,7 +103,7 @@ class ARDroneNetworkProcess(threading.Thread):
         stopping = False
         connection_lost = 1
         reconnection_needed = False
-        while not stopping:
+        while (not stopping) and (not self.stopped()):
             if reconnection_needed:
                 _disconnect(video_socket, nav_socket, control_socket)
                 video_socket, nav_socket, control_socket = _connect()

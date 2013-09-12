@@ -258,12 +258,15 @@ class ARDrone(object):
         with this object.
         """
         self.lock.acquire()
+        print 'Cancel timer'
         self.com_watchdog_timer.cancel()
+        print 'Pipe die'
         self.com_pipe.send('die!')
+        print 'Net proc terminate'
         self.network_process.terminate()
+        print 'Net proc join'
         self.network_process.join()
-        self.ipc_thread.stop()
-        self.ipc_thread.join()
+        print 'Release lock'
         self.lock.release()
 
     def get_image(self):
