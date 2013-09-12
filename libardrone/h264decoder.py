@@ -47,9 +47,13 @@ def enqueue_output(out, outfileobject, frame_size):
     frame_size_bytes = frame_size[0] * frame_size[1] * 3
     while True:
         buffer_str = out.read(frame_size_bytes)
-        im = np.frombuffer(buffer_str, count=frame_size_bytes, dtype=np.uint8)
-        im = im.reshape((frame_size[0], frame_size[1], 3))
-        outfileobject.image_ready(im)
+        if len(buffer_str) > 0:
+            im = np.frombuffer(buffer_str, count=frame_size_bytes, dtype=np.uint8)
+            im = im.reshape((frame_size[0], frame_size[1], 3))
+            outfileobject.image_ready(im)
+        else:
+            # This happens when drone is halting - do nothing
+            pass
 
 
 # Logic for making ffmpeg terminate on the death of this process
