@@ -8,7 +8,10 @@ This is a demo that shows mean-shift based tracking
 You select a color objects such as your face and it tracks it.
 This reads from the ARDrone camera - let's see if we can get the drone to track things!
 
+Original from
 http://www.robinhewitt.com/research/track/camshift.html
+edited by
+James Robert Lloyd, Sep 2013
 
 Usage:
 ------
