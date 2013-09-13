@@ -38,6 +38,8 @@ class App(object):
         self.drag_start = None
         self.tracking_state = 0
         self.show_backproj = False
+        
+        self.ai_control = False
 
     def onmouse(self, event, x, y, flags, param):
         x, y = np.int16([x, y]) # BUG
@@ -91,26 +93,97 @@ class App(object):
                     vis[mask == 0] = 0
 
                 if self.tracking_state == 1:
-                    self.selection = None
-                    prob = cv2.calcBackProject([hsv], [0], self.hist, [0, 180], 1)
-                    prob &= mask
-                    term_crit = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 1 )
-                    track_box, self.track_window = cv2.CamShift(prob, self.track_window, term_crit)
+                    try:
+                        self.selection = None
+                        prob = cv2.calcBackProject([hsv], [0], self.hist, [0, 180], 1)
+                        prob &= mask
+                        term_crit = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 1 )
+                        track_box, self.track_window = cv2.CamShift(prob, self.track_window, term_crit)
 
-                    if self.show_backproj:
-                        vis[:] = prob[...,np.newaxis]
-                    try: cv2.ellipse(vis, track_box, (0, 0, 255), 2)
-                    except: print track_box
+                        if self.show_backproj:
+                            vis[:] = prob[...,np.newaxis]
+                        try: cv2.ellipse(vis, track_box, (0, 0, 255), 2)
+                        except: print track_box
+                        x_distance = 2*(track_box[0][0] / hsv.shape[1]) - 1
+                        x_speed = 0.5 * x_distance
+                        y_distance = 2*(track_box[0][1] / hsv.shape[0]) - 1
+                        y_speed = -0.2 * y_distance
+                        z_distance = np.min([(track_box[1][0] / hsv.shape[0]), (track_box[1][1] / hsv.shape[0])]) - 0.4 # Both sizes relative to y of image
+                        z_speed = -0.3 * z_distance
+                        print (x_speed, y_speed, z_speed)
+                        print track_box
+                        if self.ai_control:
+                            self.drone.at(libardrone.at_pcmd, True, 0, -z_speed, y_speed, x_speed)
+                    except:
+                        print 'Tracking failed'
+                        self.ai_control = False
+                        self.drone.hover()
 
                 cv2.imshow('camshift', vis)
 
-                ch = 0xFF & cv2.waitKey(5)
+                #ch = 0xFF & cv2.waitKey(5)
+                ch = cv2.waitKey(5)
                 if ch == 27:
+                    self.drone.emergency()
+                if ch == ord('q'):
                     break
                 if ch == ord('b'):
                     self.show_backproj = not self.show_backproj
+                if ch == ord('\r'):
+                    self.drone.takeoff()
+                if ch == ord(' '):
+                    self.drone.land()                
+                if ch == ord('a'):
+                    self.drone.move_left()
+                    self.ai_control = False
+                    self.drone.hover()
+                if ch == ord('d'):
+                    self.drone.move_right()
+                    self.ai_control = False
+                    self.drone.hover()
+                if ch == ord('w'):
+                    self.drone.move_forward()
+                    self.ai_control = False
+                    self.drone.hover()
+                if ch == ord('s'):
+                    self.drone.move_backward()
+                    self.ai_control = False
+                    self.drone.hover()
+                if ch == 63234:
+                    self.drone.turn_left(mult=2.5)
+                    self.ai_control = False
+                    self.drone.hover()
+                if ch == 63235:
+                    self.drone.turn_right(mult=2.5)
+                    self.ai_control = False
+                    self.drone.hover()
+                if ch == 63232:
+                    self.drone.move_up()
+                    self.ai_control = False
+                    self.drone.hover()
+                if ch == 63233:
+                    self.drone.move_down()
+                    self.ai_control = False
+                    self.drone.hover()
+                if (ch == ord('z')) or (ch == ord('x')) or (ch == ord('c')) or (ch == ord('v')): # i.e. can mash keyboard
+                    self.drone.hover()
+                    self.ai_control = False
+                    self.drone.hover()
+                if ch == ord('y'):
+                    self.drone.trim()
+                if ch == ord('p'):
+                    self.drone.reset()
+                if ch == ord('t'):
+                    self.ai_control = not self.ai_control
+                    if self.ai_control:
+                        print 'AI in control'
+                    else:
+                        self.drone.hover()
+                        print 'No AI control'
         finally:
             cv2.destroyAllWindows()
+            self.drone.emergency()
+            self.drone.reset()
             self.drone.halt()
 
 
