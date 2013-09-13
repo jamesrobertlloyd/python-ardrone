@@ -110,8 +110,8 @@ class App(object):
                         y_speed = -0.2 * y_distance
                         z_distance = np.min([(track_box[1][0] / hsv.shape[0]), (track_box[1][1] / hsv.shape[0])]) - 0.4 # Both sizes relative to y of image
                         z_speed = -0.3 * z_distance
-                        print (x_speed, y_speed, z_speed)
-                        print track_box
+                        #print (x_speed, y_speed, z_speed)
+                        #print track_box
                         if self.ai_control:
                             self.drone.at(libardrone.at_pcmd, True, 0, -z_speed, y_speed, x_speed)
                     except:
