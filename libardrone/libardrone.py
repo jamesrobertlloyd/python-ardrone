@@ -172,9 +172,15 @@ class ARDrone(object):
         """Make the drone rotate right."""
         self.at(at_pcmd, True, 0, 0, 0, self.speed)
 
-    def reset(self):
-        """Toggle the drone's emergency state."""
+    def emergency(self):
+        """Enter emergency state."""
         self.at(at_ref, False, True)
+        self.at(at_ref, False, False)
+
+    def reset(self):
+        """Exit the emergency state"""
+        self.at(at_ref, False, True)
+        time.sleep(5)
         self.at(at_ref, False, False)
 
     def trim(self):
