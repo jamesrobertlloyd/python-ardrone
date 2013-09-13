@@ -136,39 +136,30 @@ class App(object):
                 if ch == ord('a'):
                     self.drone.move_left()
                     self.ai_control = False
-                    self.drone.hover()
                 if ch == ord('d'):
                     self.drone.move_right()
                     self.ai_control = False
-                    self.drone.hover()
                 if ch == ord('w'):
                     self.drone.move_forward()
                     self.ai_control = False
-                    self.drone.hover()
                 if ch == ord('s'):
                     self.drone.move_backward()
                     self.ai_control = False
-                    self.drone.hover()
                 if ch == 63234:
                     self.drone.turn_left(mult=2.5)
                     self.ai_control = False
-                    self.drone.hover()
                 if ch == 63235:
                     self.drone.turn_right(mult=2.5)
                     self.ai_control = False
-                    self.drone.hover()
                 if ch == 63232:
                     self.drone.move_up()
                     self.ai_control = False
-                    self.drone.hover()
                 if ch == 63233:
                     self.drone.move_down()
                     self.ai_control = False
-                    self.drone.hover()
                 if (ch == ord('z')) or (ch == ord('x')) or (ch == ord('c')) or (ch == ord('v')): # i.e. can mash keyboard
                     self.drone.hover()
                     self.ai_control = False
-                    self.drone.hover()
                 if ch == ord('y'):
                     self.drone.trim()
                 if ch == ord('p'):
