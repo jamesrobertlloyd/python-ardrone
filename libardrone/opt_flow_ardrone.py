@@ -5,8 +5,8 @@ Camshift tracker
 ================
 
 This is a demo that shows mean-shift based tracking
-You select a color objects such as your face and it tracks it.
-This reads from the ARDrone camera - let's see if we can get the drone to track things!
+
+Now trying to use optical flow to find objects
 
 Original from
 http://www.robinhewitt.com/research/track/camshift.html
@@ -21,8 +21,8 @@ Usage:
 
 Keys:
 -----
-    ESC   - exit
-    b     - toggle back-projected probability visualization
+    ESC    - exit
+    others - other stuff
 '''
 
 import numpy as np
@@ -64,16 +64,6 @@ class App(object):
                 self.drag_start = None
                 if self.selection is not None:
                     self.tracking_state = 1
-
-    def show_hist(self):
-        bin_count = self.hist.shape[0]
-        bin_w = 24
-        img = np.zeros((256, bin_count*bin_w, 3), np.uint8)
-        for i in xrange(bin_count):
-            h = int(self.hist[i])
-            cv2.rectangle(img, (i*bin_w+2, 255), ((i+1)*bin_w-2, 255-h), (int(180.0*i/bin_count), 255, 255), -1)
-        img = cv2.cvtColor(img, cv2.COLOR_HSV2RGB)
-        cv2.imshow('hist', img)
 
     def run(self):
         try:
@@ -121,7 +111,7 @@ class App(object):
                         x_speed = x_speed * self.speed_multiplier
                         y_speed = y_speed * self.speed_multiplier
                         z_speed = z_speed * self.speed_multiplier
-                        
+
                         if self.ai_control:
                             self.drone.at(libardrone.at_pcmd, True, 0, -z_speed, y_speed, x_speed)
                     except:
