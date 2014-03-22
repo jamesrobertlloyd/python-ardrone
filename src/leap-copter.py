@@ -20,7 +20,7 @@ Keys:
 
 import sys
 sys.path.append('../libleap/')
-sys.path.append('../libardone/')
+sys.path.append('../libardrone/')
 
 import numpy as np
 import cv2
@@ -45,7 +45,7 @@ class LeapToQuadListener(Leap.Listener):
         print "Exited leap motion listener"
 
     def on_frame(self, controller):
-        if self.parent.leap_control and (not self.ai_control):
+        if self.parent.leap_control and (not self.parent.ai_control):
 
             # Get the most recent frame and report some basic information
             frame = controller.frame()
@@ -57,17 +57,39 @@ class LeapToQuadListener(Leap.Listener):
                 roll = normal.roll * Leap.RAD_TO_DEG
                 pitch = direction.pitch * Leap.RAD_TO_DEG
                 yaw = direction.yaw * Leap.RAD_TO_DEG
+                up_down = hand.palm_position[1] - 300
+                left_right = hand.palm_position[0]
 
                 threshold = 20 # Number of degress before command is registered
 
-                if roll < -threshold:
-                    self.parent.drone.move_right()
-                elif roll > threshold:
-                    self.parent.drone.move_left()
-                elif pitch < -threshold:
-                    self.parent.drone.move_forward()
-                elif pitch > threshold:
-                    self.parent.drone.move_backward()
+                # if roll < -threshold:
+                #     self.parent.drone.move_right()
+                # elif roll > threshold:
+                #     self.parent.drone.move_left()
+                # elif pitch < -threshold:
+                #     self.parent.drone.move_forward()
+                # elif pitch > threshold:
+                #     self.parent.drone.move_backward()
+                # else:
+                #     self.parent.drone.hover()
+
+                scale_factor = self.parent.drone.speed / threshold
+                up_down_scale_factor = self.parent.drone.speed / 50
+                yaw_scale_factor = self.parent.drone.speed / 50
+
+                # if np.abs(roll) < 10:
+                #     roll = 0
+                # if np.abs(pitch) < 10:
+                #     pitch = 0
+                # if np.abs(up_down) < 25:
+                #     up_down = 0
+                # if np.abs(left_right) < 10:
+                #     left_right = 0
+
+                self.parent.drone.set_velocity(-roll * scale_factor, pitch * scale_factor, \
+                                                up_down * up_down_scale_factor, left_right * yaw_scale_factor)
+                print hand.palm_position
+                print yaw
 
             else:
                 # Probably want to hover or something else neutral

@@ -77,7 +77,7 @@ class ARDrone(object):
         self.timer_t = 0.2
         self.com_watchdog_timer = threading.Timer(self.timer_t, self.commwdg)
         self.lock = threading.Lock()
-        self.speed = 0.2
+        self.speed = 0.1
         self.hd = hd
         if (self.hd):
             self.image_shape = (720, 1280, 3)
@@ -139,6 +139,10 @@ class ARDrone(object):
     def hover(self):
         """Make the drone hover."""
         self.at(at_pcmd, False, 0, 0, 0, 0)
+
+    def set_velocity(self, left_right, forward_backward, up_down, yaw):
+        """Directly set the velocity of the drone"""
+        self.at(at_pcmd, True, left_right, forward_backward, up_down, yaw)
 
     def move_left(self):
         """Make the drone move left."""
