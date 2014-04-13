@@ -28,12 +28,16 @@ Keys:
 import numpy as np
 import cv2
 
-import libardrone
+#import libardrone
 
 class App(object):
     def __init__(self):
-        self.drone = libardrone.ARDrone(is_ar_drone_2=True)
-        self.frame = cv2.cvtColor(self.drone.get_image(), cv2.COLOR_BGR2RGB)
+        #self.drone = libardrone.ARDrone(is_ar_drone_2=True)
+        cv2.namedWindow("preview")
+        self.camera = cv2.VideoCapture(0)
+        rval, self.frame = self.camera.read()
+
+        #self.frame = cv2.cvtColor(self.drone.get_image(), cv2.COLOR_BGR2RGB)
         cv2.namedWindow('camshift')
         cv2.setMouseCallback('camshift', self.onmouse)
 
@@ -78,7 +82,8 @@ class App(object):
     def run(self):
         try:
             while True:
-                self.frame = cv2.cvtColor(self.drone.get_image(), cv2.COLOR_BGR2RGB)
+                #self.frame = cv2.cvtColor(self.drone.get_image(), cv2.COLOR_BGR2RGB)
+                ret_val, self.frame = self.camera.read()
                 vis = self.frame.copy()
                 hsv = cv2.cvtColor(self.frame, cv2.COLOR_RGB2HSV)
                 mask = cv2.inRange(hsv, np.array((0., 60., 32.)), np.array((180., 255., 255.)))
@@ -102,7 +107,8 @@ class App(object):
                         self.selection = None
                         prob = cv2.calcBackProject([hsv], [0], self.hist, [0, 180], 1)
                         prob &= mask
-                        term_crit = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 1 )
+                        #term_crit = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 1 )
+                        term_crit = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 100, 100 )
                         track_box, self.track_window = cv2.CamShift(prob, self.track_window, term_crit)
 
                         if self.show_backproj:
@@ -127,7 +133,7 @@ class App(object):
                     except:
                         print 'Tracking failed'
                         self.ai_control = False
-                        self.drone.hover()
+                        #self.drone.hover()
 
                 cv2.imshow('camshift', vis)
 
@@ -187,9 +193,9 @@ class App(object):
                         print 'No AI control'
         finally:
             cv2.destroyAllWindows()
-            self.drone.emergency()
-            self.drone.reset()
-            self.drone.halt()
+            #self.drone.emergency()
+            #self.drone.reset()
+            #self.drone.halt()
 
 
 if __name__ == '__main__':

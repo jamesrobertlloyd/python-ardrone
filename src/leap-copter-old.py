@@ -18,8 +18,6 @@ Keys:
     ...to be updated...
 '''
 
-DRONE = True
-
 import sys
 sys.path.append('../libleap/')
 sys.path.append('../libardrone/')
@@ -27,8 +25,7 @@ sys.path.append('../libardrone/')
 import numpy as np
 import cv2
 
-if DRONE:
-    import libardrone
+import libardrone
 
 import Leap
 from Leap import CircleGesture, KeyTapGesture, ScreenTapGesture, SwipeGesture
@@ -112,22 +109,10 @@ class LeapToQuadListener(Leap.Listener):
             return "STATE_INVALID"
 
 class App(object):
-    def reset_speed(self):
-        self.x_speed = 0
-        self.y_speed = 0
-        self.z_speed = 0
-
     def __init__(self):
-        if DRONE:
-            self.drone = libardrone.ARDrone(is_ar_drone_2=True)
-            self.frame = cv2.cvtColor(self.drone.get_image(), cv2.COLOR_BGR2RGB)
-        else:
-            self.camera = cv2.VideoCapture(0)
-            rval, self.frame = self.camera.read()
-
+        self.drone = libardrone.ARDrone(is_ar_drone_2=True)
+        self.frame = cv2.cvtColor(self.drone.get_image(), cv2.COLOR_BGR2RGB)
         cv2.namedWindow('camshift')
-        #cv2.namedWindow('mask')
-        #cv2.namedWindow('prob')
         cv2.setMouseCallback('camshift', self.onmouse)
 
         self.selection = None
@@ -138,6 +123,8 @@ class App(object):
         self.ai_control = False
         self.leap_control = False
 
+        self.speed_multiplier = 1
+
         # Set up leap motion listener
 
         self.listener = LeapToQuadListener()
@@ -147,13 +134,6 @@ class App(object):
 
         # Have the listener receive events from the controller
         self.controller.add_listener(self.listener)
-
-        # Controller stuff
-        self.reset_speed()
-        self.I_gain = 0.05
-        self.I_decay = 0.90
-        self.tracking_status_changed = False
-        self.z_set_height = 0.4
 
     def onmouse(self, event, x, y, flags, param):
         x, y = np.int16([x, y]) # BUG
@@ -173,24 +153,19 @@ class App(object):
                 self.drag_start = None
                 if self.selection is not None:
                     self.tracking_state = 1
-                    self.reset_speed()
 
     def run(self):
         try:
             while True:
-                if DRONE:
-                    self.frame = cv2.cvtColor(self.drone.get_image(), cv2.COLOR_BGR2RGB)
-                else:
-                    rval, self.frame = self.camera.read()
+                self.frame = cv2.cvtColor(self.drone.get_image(), cv2.COLOR_BGR2RGB)
                 vis = self.frame.copy()
-                hsv_image = cv2.cvtColor(self.frame, cv2.COLOR_RGB2HSV)
-                mask = cv2.inRange(hsv_image, np.array((0., 60., 32.)), np.array((180., 255., 255.)))
-                #mask = cv2.inRange(hsv_image, np.array((0., 0., 0.)), np.array((180., 255., 255.)))
+                hsv = cv2.cvtColor(self.frame, cv2.COLOR_RGB2HSV)
+                mask = cv2.inRange(hsv, np.array((0., 60., 32.)), np.array((180., 255., 255.)))
 
                 if self.selection:
                     x0, y0, x1, y1 = self.selection
                     self.track_window = (x0, y0, x1-x0, y1-y0)
-                    hsv_roi = hsv_image[y0:y1, x0:x1]
+                    hsv_roi = hsv[y0:y1, x0:x1]
                     mask_roi = mask[y0:y1, x0:x1]
                     hist = cv2.calcHist( [hsv_roi], [0], mask_roi, [16], [0, 180] )
                     cv2.normalize(hist, hist, 0, 255, cv2.NORM_MINMAX);
@@ -203,72 +178,36 @@ class App(object):
                 if self.tracking_state == 1:
                     try:
                         self.selection = None
-                        prob = cv2.calcBackProject([hsv_image], [0], self.hist, [0,180], 1)
+                        prob = cv2.calcBackProject([hsv], [0], self.hist, [0, 180], 1)
                         prob &= mask
-                        term_crit = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 100, 1 )
+                        term_crit = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 1 )
                         track_box, self.track_window = cv2.CamShift(prob, self.track_window, term_crit)
 
-                        #cv2.imshow('prob', prob[...,np.newaxis])
+                        if self.show_backproj:
+                            vis[:] = prob[...,np.newaxis]
                         try: cv2.ellipse(vis, track_box, (0, 0, 255), 2)
                         except: print track_box
-                        x_distance = 2*(track_box[0][0] / hsv_image.shape[1]) - 1
-                        x_error = -0.5 * x_distance
-                        y_distance = 2*(track_box[0][1] / hsv_image.shape[0]) - 1
-                        y_error = 0.2 * y_distance
-                        #z_distance = np.min([(track_box[1][0] / hsv_image.shape[0]), (track_box[1][1] / hsv_image.shape[0])])
-                        # This is an approximation to the correct solution
-                        z_height = (track_box[1][1] / hsv_image.shape[0])
-                        if self.tracking_status_changed:
-                            self.z_set_height = z_height
-                            self.tracking_status_changed = False
-                        z_error = -0.3 * ((z_height / self.z_set_height) - 1)
+                        x_distance = 2*(track_box[0][0] / hsv.shape[1]) - 1
+                        x_speed = 0.5 * x_distance
+                        y_distance = 2*(track_box[0][1] / hsv.shape[0]) - 1
+                        y_speed = -0.2 * y_distance
+                        z_distance = np.min([(track_box[1][0] / hsv.shape[0]), (track_box[1][1] / hsv.shape[0])]) - 0.4 # Both sizes relative to y of image
+                        z_speed = -0.3 * z_distance
                         #print (x_speed, y_speed, z_speed)
                         #print track_box
 
-                        # P controller
-                        #self.x_speed = -x_error * self.drone.speed
-                        #self.y_speed = -y_error * self.drone.speed
-                        #self.z_speed = -z_error * self.drone.speed
-
-                        # I controller
-                        self.x_speed = self.I_decay * self.x_speed - x_error * self.I_gain * self.drone.speed
-                        self.y_speed = self.I_decay * self.y_speed - y_error * self.I_gain * self.drone.speed
-                        self.z_speed = self.I_decay * self.z_speed - z_error * self.I_gain * self.drone.speed
-
-                        print 'Error: %0.4f %0.4f %0.4f' % (x_error, y_error, z_error)
-                        print 'Speed: %0.4f %0.4f %0.4f' % (self.x_speed, self.y_speed, self.z_speed)
-                        print 'I_gain: %0.4f' % self.I_gain
-                        print 'I_decay: %0.4f' % self.I_decay
-
-                        max_speed = 0.5 * self.drone.speed
-
-                        if self.x_speed > max_speed:
-                            self.x_speed = max_speed
-                        elif self.x_speed < -max_speed:
-                            self.x_speed = -max_speed  
-
-                        if self.y_speed > max_speed:
-                            self.y_speed = max_speed
-                        elif self.y_speed < -max_speed:
-                            self.y_speed = -max_speed  
-
-                        if self.z_speed > max_speed:
-                            self.z_speed = max_speed
-                        elif self.z_speed < -max_speed:
-                            self.z_speed = -max_speed                     
+                        x_speed = x_speed * self.speed_multiplier
+                        y_speed = y_speed * self.speed_multiplier
+                        z_speed = z_speed * self.speed_multiplier
                         
                         if self.ai_control:
-                            self.drone.at(libardrone.at_pcmd, True, 0, self.z_speed, self.y_speed, self.x_speed)
+                            self.drone.at(libardrone.at_pcmd, True, 0, -z_speed, y_speed, x_speed)
                     except:
-                        e = sys.exc_info()[0]
                         print 'Tracking failed'
-                        #print e
                         self.ai_control = False
-                        if DRONE:
-                            self.drone.hover()
+                        self.drone.hover()
 
                 cv2.imshow('camshift', vis)
-                #cv2.imshow('mask', mask)
 
                 #ch = 0xFF & cv2.waitKey(5)
                 ch = cv2.waitKey(5)
@@ -294,18 +233,10 @@ class App(object):
                 if ch == ord('s'):
                     self.drone.move_backward()
                     self.ai_control = False
-                if ch == ord('5'):
-                    self.I_decay = self.I_decay + 0.01
-                if ch == ord('4'):
-                    self.I_decay = self.I_decay - 0.01
-                if ch == ord('7'):
-                    self.I_gain = self.I_gain * 1.5
-                if ch == ord('6'):
-                    self.I_gain = self.I_gain * 0.75
                 if ch == ord('9'):
-                    self.drone.speed = self.drone.speed * 1.1
+                    self.speed_multiplier = self.speed_multiplier * 1.1
                 if ch == ord('8'):
-                    self.drone.speed = self.drone.speed * 0.9
+                    self.speed_multiplier = self.speed_multiplier * 0.9
                 if ch == ord('1'):
                     self.leap_control = not self.leap_control
                     if self.leap_control:
@@ -332,14 +263,11 @@ class App(object):
                 if ch == ord('p'):
                     self.drone.reset()
                 if ch == ord('t'):
-                    self.reset_speed()
                     self.ai_control = not self.ai_control
-                    self.tracking_status_changed = True
                     if self.ai_control:
                         print 'AI in control'
                     else:
-                        if DRONE:
-                            self.drone.hover()
+                        self.drone.hover()
                         print 'No AI control'
         finally:
             # Remove the sample listener when done
@@ -347,10 +275,9 @@ class App(object):
             # Close OpenCV
             cv2.destroyAllWindows()
             # Turn off drone
-            if DRONE:
-                self.drone.emergency()
-                self.drone.reset()
-                self.drone.halt()
+            self.drone.emergency()
+            self.drone.reset()
+            self.drone.halt()
 
 
 if __name__ == '__main__':

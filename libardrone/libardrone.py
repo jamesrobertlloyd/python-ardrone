@@ -77,7 +77,7 @@ class ARDrone(object):
         self.timer_t = 0.2
         self.com_watchdog_timer = threading.Timer(self.timer_t, self.commwdg)
         self.lock = threading.Lock()
-        self.speed = 0.1
+        self.speed = 1 # TODO - comment on sensible values!
         self.hd = hd
         if (self.hd):
             self.image_shape = (720, 1280, 3)
